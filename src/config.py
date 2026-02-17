@@ -24,12 +24,12 @@ class Config:
     # OpenViking local storage
     ov_data_path: str = os.getenv("OV_DATA_PATH", "./data/ov_store")
 
-    # Volcengine / Doubao
-    volcengine_api_key: str = os.getenv("VOLCENGINE_API_KEY", "")
-    volcengine_api_base: str = os.getenv("VOLCENGINE_API_BASE", "")
-    doubao_embedding_model: str = os.getenv("DOUBAO_EMBEDDING_MODEL", "")
-    doubao_embedding_dim: int = int(os.getenv("DOUBAO_EMBEDDING_DIM", "2048"))
-    doubao_vlm_model: str = os.getenv("DOUBAO_VLM_MODEL", "")
+    # Embedding / VLM service
+    embedding_api_key: str = os.getenv("EMBEDDING_API_KEY", "")
+    embedding_api_base: str = os.getenv("EMBEDDING_API_BASE", "")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "")
+    embedding_dim: int = int(os.getenv("EMBEDDING_DIM", "2048"))
+    vlm_model: str = os.getenv("VLM_MODEL", "")
 
 
 cfg = Config()

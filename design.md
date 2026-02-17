@@ -6,8 +6,8 @@
 
 **核心验证点**：
 1.  **Restate 编排能力**：验证 Agent 间的 RPC 调用和状态保持。
-2.  **OpenViking 知识流转**：验证“知识检索 -> 代码生成 -> 知识归档”的闭环。
-3.  **Sandbox 模拟**：验证“共享文件系统 + 远程命令执行”的协作模式。
+2.  **OpenViking 知识流转**：验证"知识检索 -> 代码生成 -> 知识归档"的闭环。
+3.  **Sandbox 模拟**：验证"共享文件系统 + 远程命令执行"的协作模式。
 
 ---
 
@@ -17,7 +17,7 @@
 | :--- | :--- | :--- |
 | **包管理器** | **uv** | 极速 Python 包管理与虚拟环境管理 |
 | **编排引擎** | **Restate (Binary)** | 本地启动 `restate-server`，处理服务间通讯 |
-| **知识库** | **OpenViking (Lib)** | 本地运行库，数据存本地磁盘，Embedding 调 **火山引擎** |
+| **知识库** | **OpenViking (Lib)** | 本地运行库，数据存本地磁盘，Embedding 调远端服务 |
 | **LLM** | **Anthropic SDK** | 代码库用 `anthropic`，但配置 **自定义 Endpoint** 和模型 |
 | **沙箱** | **Local Dir + Subprocess** | 在 `/tmp` 下创建目录模拟 Pod，用子进程模拟执行 |
 | **语言** | Python 3.11+ | - |
@@ -31,6 +31,7 @@
 ```text
 lbg-demo/
 ├── .env                    # 敏感配置 (API Keys, Endpoints)
+├── .env.example            # 配置模板（无真实密钥）
 ├── pyproject.toml          # uv 依赖定义
 ├── uv.lock                 # 版本锁定
 ├── src/
@@ -58,7 +59,7 @@ lbg-demo/
     *   **特殊处理**：确保 Anthropic SDK 能正确请求非 Claude 模型（通常需要调整 header 或忽略某些参数）。
 
 2.  **`OVClient` (Wrapper)**
-    *   **配置**：从 `.env` 读取 `VOLCENGINE_API_KEY`, `DOUBAO_EMBEDDING_MODEL`。
+    *   **配置**：从 `.env` 读取 `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` 等。
     *   **初始化**：使用 `ov.SyncOpenViking`，配置本地路径 `./data/ov_store`。
     *   **功能**：
         *   `init()`: 初始化/加载索引。
@@ -109,7 +110,7 @@ sequenceDiagram
     participant LLM as LLM Service
 
     User->>Manager: 1. "写一个冒泡排序"
-    
+
     rect rgb(240, 248, 255)
         Note right of Manager: 初始化阶段
         Manager->>Sandbox: Create Project "sort_app"
@@ -146,38 +147,28 @@ sequenceDiagram
 ---
 
 ## 5. 环境配置清单 (.env)
-已经准备好的环境配置项
+参见 `.env.example` 文件获取完整模板。
 
 ```ini
 # --- Restate ---
 RESTATE_URL=http://localhost:8080
 
-# --- LLM (Custom Anthropic Compatible) ---
-# 用于 Agent 思考 (Manager/Coder/Tester)
+# --- LLM (OpenAI-compatible endpoint) ---
 LLM_BASE_URL=https://api.your-provider.com/v1
 LLM_API_KEY=sk-xxxxxxxxxxxxxxxx
-LLM_MODEL_NAME=claude-3-5-sonnet-20240620
+LLM_MODEL_NAME=your-model-name
 
-# --- OpenViking (Volcengine Configuration) ---
-# 1. 本地存储路径
+# --- OpenViking ---
 OV_DATA_PATH=./data/ov_store
 
-# 2. 火山引擎通用配置
-# 豆包 API Key (通常 Embedding 和 VLM 共用一个 Key，也可以分开配置)
-VOLCENGINE_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-# 火山引擎 API Base URL (通常是 ark.cn-beijing.volces.com)
-VOLCENGINE_API_BASE=https://ark.cn-beijing.volces.com/api/v3
+# Embedding service
+EMBEDDING_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+EMBEDDING_API_BASE=https://api.your-embedding-provider.com/v3
+EMBEDDING_MODEL=your-embedding-model
+EMBEDDING_DIM=2048
 
-# 3. Embedding 模型配置 (用于文本向量化)
-# 模型 Endpoint ID (例如: ep-20250217xxxxxx-xxxxx)
-DOUBAO_EMBEDDING_MODEL=ep-xxxxxxxx-xxxxx
-# 向量维度 (豆包通常是 1024 或 768，需确认模型规格)
-DOUBAO_EMBEDDING_DIM=1024
-
-# 4. VLM 模型配置 (用于多模态理解/图片索引)
-# 模型 Endpoint ID (例如: ep-20250217xxxxxx-xxxxx)
-# 如果不需要处理图片，这个可以留空，但在代码里要处理空值情况
-DOUBAO_VLM_MODEL=ep-xxxxxxxx-xxxxx
+# VLM (optional)
+VLM_MODEL=your-vlm-model
 ```
 
 ---

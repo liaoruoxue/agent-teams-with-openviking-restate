@@ -24,7 +24,7 @@ class TestEnsureOvConf:
     @patch("src.infra.ov_client._OV_CONF_DIR")
     def test_skips_if_no_api_key(self, mock_dir, mock_path, mock_cfg):
         mock_path.exists.return_value = False
-        mock_cfg.volcengine_api_key = ""
+        mock_cfg.embedding_api_key = ""
 
         from src.infra.ov_client import _ensure_ov_conf
         _ensure_ov_conf()
@@ -39,11 +39,11 @@ class TestEnsureOvConf:
         monkeypatch.setattr("src.infra.ov_client._OV_CONF_PATH", conf_path)
 
         mock_cfg = MagicMock()
-        mock_cfg.volcengine_api_key = "test-key"
-        mock_cfg.volcengine_api_base = "http://api.test"
-        mock_cfg.doubao_embedding_model = "embed-model"
-        mock_cfg.doubao_embedding_dim = 1024
-        mock_cfg.doubao_vlm_model = ""
+        mock_cfg.embedding_api_key = "test-key"
+        mock_cfg.embedding_api_base = "http://api.test"
+        mock_cfg.embedding_model = "embed-model"
+        mock_cfg.embedding_dim = 1024
+        mock_cfg.vlm_model = ""
         monkeypatch.setattr("src.infra.ov_client.cfg", mock_cfg)
 
         from src.infra.ov_client import _ensure_ov_conf
@@ -63,11 +63,11 @@ class TestEnsureOvConf:
         monkeypatch.setattr("src.infra.ov_client._OV_CONF_PATH", conf_path)
 
         mock_cfg = MagicMock()
-        mock_cfg.volcengine_api_key = "key"
-        mock_cfg.volcengine_api_base = "http://api"
-        mock_cfg.doubao_embedding_model = "em"
-        mock_cfg.doubao_embedding_dim = 2048
-        mock_cfg.doubao_vlm_model = "vlm-model"
+        mock_cfg.embedding_api_key = "key"
+        mock_cfg.embedding_api_base = "http://api"
+        mock_cfg.embedding_model = "em"
+        mock_cfg.embedding_dim = 2048
+        mock_cfg.vlm_model = "vlm-model"
         monkeypatch.setattr("src.infra.ov_client.cfg", mock_cfg)
 
         from src.infra.ov_client import _ensure_ov_conf

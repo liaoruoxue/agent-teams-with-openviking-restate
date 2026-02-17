@@ -27,7 +27,7 @@ Demo 在本地 Mac 上跑通了一条完整的 **Agent 协作链路**：
 | OpenViking 知识流转 | "检索 → 生成 → 归档" 闭环跑通，`find` + `overview` + `add_resource` API 工作正常 |
 | Sandbox 模拟 | 本地文件系统 + subprocess 模拟 Pod 执行环境可行，支持代码写入/读取/执行 |
 
-**实测结果**：发送 "写一个冒泡排序" → GLM-5 生成代码 → 执行输出 `[1, 2, 3, 4, 5]` → 一次通过，零重试。
+**实测结果**：发送 "写一个冒泡排序" → LLM 生成代码 → 执行输出 `[1, 2, 3, 4, 5]` → 一次通过，零重试。
 
 ---
 
@@ -37,7 +37,7 @@ Demo 在本地 Mac 上跑通了一条完整的 **Agent 协作链路**：
 |------|------|------|------|
 | 编排引擎 | [Restate](https://restate.dev/) | server binary | Agent 间 RPC、状态管理、side effect 持久化 |
 | 知识库 | [OpenViking](https://github.com/volcengine/OpenViking) | 0.1.17 | 知识存储/检索，L0/L1/L2 分层上下文 |
-| LLM | Anthropic SDK + 自定义 endpoint | — | Agent 思考能力（当前用 GPUGeek 的 GLM-5） |
+| LLM | Anthropic SDK + 自定义 endpoint | — | Agent 思考能力（兼容 OpenAI 的 LLM 服务） |
 | 沙箱 | 本地文件系统 + subprocess | — | 模拟代码执行环境 |
 | 包管理 | [uv](https://docs.astral.sh/uv/) | — | Python 项目管理 |
 
@@ -51,8 +51,9 @@ cd lab8_restate_viking_agents
 # 1. 安装依赖
 uv sync && uv sync --group dev
 
-# 2. 确认 .env 配置（API keys 已填好）
-cat .env
+# 2. 配置环境变量（复制模板并填写你的 API keys）
+cp .env.example .env
+# 编辑 .env 填入你的 LLM 和 Embedding 服务配置
 
 # 3. 启动 Restate server（另一个终端，如果还没启动）
 restate-server
@@ -183,10 +184,10 @@ async def handle_task(ctx: ObjectContext, req: dict) -> dict:
 这意味着 LLM 调用、文件 I/O、外部 API 都必须包裹在 `ctx.run()` 中，否则重试时会重复执行。
 
 ```python
-# ✅ 正确：LLM 调用包裹在 ctx.run 中
+# 正确：LLM 调用包裹在 ctx.run 中
 response = await ctx.run("llm_call", _call_llm)
 
-# ❌ 错误：直接调用会导致重试时重复执行
+# 错误：直接调用会导致重试时重复执行
 response = llm_client.chat(system, user)
 ```
 
@@ -198,16 +199,16 @@ OpenViking 需要 `~/.openviking/ov.conf` 配置 embedding 和 VLM 模型。`OVC
 def _ensure_ov_conf():
     conf = {
         "embedding": {"dense": {
-            "provider": "volcengine",
-            "api_key": cfg.volcengine_api_key,
-            "api_base": cfg.volcengine_api_base,
-            "model": cfg.doubao_embedding_model,
-            "dimension": cfg.doubao_embedding_dim,
+            "provider": "...",
+            "api_key": cfg.embedding_api_key,
+            "api_base": cfg.embedding_api_base,
+            "model": cfg.embedding_model,
+            "dimension": cfg.embedding_dim,
         }},
         "vlm": {
-            "provider": "volcengine",
-            "api_key": cfg.volcengine_api_key,
-            "model": cfg.doubao_vlm_model,
+            "provider": "...",
+            "api_key": cfg.embedding_api_key,
+            "model": cfg.vlm_model,
         }
     }
     Path("~/.openviking/ov.conf").write_text(json.dumps(conf))
@@ -412,23 +413,23 @@ client.glob(pattern="**/*.py", uri=root_uri)
 client.close()
 ```
 
-配置文件 `~/.openviking/ov.conf`：
+配置文件 `~/.openviking/ov.conf`（由 OVClient 自动从 .env 生成）：
 ```json
 {
   "embedding": {
     "dense": {
-      "provider": "volcengine",
+      "provider": "your-provider",
       "api_key": "...",
-      "api_base": "https://ark.cn-beijing.volces.com/api/v3",
-      "model": "doubao-embedding-vision-251215",
+      "api_base": "https://api.your-embedding-provider.com/v3",
+      "model": "your-embedding-model",
       "dimension": 2048
     }
   },
   "vlm": {
-    "provider": "volcengine",
+    "provider": "your-provider",
     "api_key": "...",
-    "api_base": "https://ark.cn-beijing.volces.com/api/v3",
-    "model": "doubao-seed-2-0-pro-260215"
+    "api_base": "https://api.your-embedding-provider.com/v3",
+    "model": "your-vlm-model"
   }
 }
 ```
@@ -451,6 +452,7 @@ client.close()
 ```
 lab8_restate_viking_agents/
 ├── .env                     API keys 和端点配置（不入 git）
+├── .env.example             配置模板（无真实密钥，入 git）
 ├── .gitignore               排除 .env, .venv, data/, /tmp/lbg/
 ├── design.md                原始设计文档
 ├── ENGINEERING_GUIDE.md     本文档

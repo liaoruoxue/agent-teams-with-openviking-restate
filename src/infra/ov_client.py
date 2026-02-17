@@ -23,29 +23,29 @@ def _ensure_ov_conf() -> None:
         log.debug("ov.conf already exists at %s", _OV_CONF_PATH)
         return
 
-    if not cfg.volcengine_api_key:
-        log.warning("VOLCENGINE_API_KEY not set — skipping ov.conf generation")
+    if not cfg.embedding_api_key:
+        log.warning("EMBEDDING_API_KEY not set — skipping ov.conf generation")
         return
 
     conf: dict = {
         "embedding": {
             "dense": {
-                "provider": "volcengine",
-                "api_key": cfg.volcengine_api_key,
-                "api_base": cfg.volcengine_api_base,
-                "model": cfg.doubao_embedding_model,
-                "dimension": cfg.doubao_embedding_dim,
+                "provider": cfg.embedding_api_base.split("//")[-1].split(".")[0] if cfg.embedding_api_base else "default",
+                "api_key": cfg.embedding_api_key,
+                "api_base": cfg.embedding_api_base,
+                "model": cfg.embedding_model,
+                "dimension": cfg.embedding_dim,
             }
         },
     }
 
     # Only add VLM section when the model is configured
-    if cfg.doubao_vlm_model:
+    if cfg.vlm_model:
         conf["vlm"] = {
-            "provider": "volcengine",
-            "api_key": cfg.volcengine_api_key,
-            "api_base": cfg.volcengine_api_base,
-            "model": cfg.doubao_vlm_model,
+            "provider": cfg.embedding_api_base.split("//")[-1].split(".")[0] if cfg.embedding_api_base else "default",
+            "api_key": cfg.embedding_api_key,
+            "api_base": cfg.embedding_api_base,
+            "model": cfg.vlm_model,
         }
 
     _OV_CONF_DIR.mkdir(parents=True, exist_ok=True)

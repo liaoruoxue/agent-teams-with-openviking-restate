@@ -42,15 +42,15 @@ class TestConfig:
         cfg = self._fresh_config(monkeypatch)
         assert cfg.ov_data_path == "./data/ov_store"
 
-    def test_doubao_embedding_dim_default(self, monkeypatch):
-        monkeypatch.delenv("DOUBAO_EMBEDDING_DIM", raising=False)
+    def test_embedding_dim_default(self, monkeypatch):
+        monkeypatch.delenv("EMBEDDING_DIM", raising=False)
         cfg = self._fresh_config(monkeypatch)
-        assert cfg.doubao_embedding_dim == 2048
+        assert cfg.embedding_dim == 2048
 
-    def test_doubao_embedding_dim_custom(self, monkeypatch):
-        monkeypatch.setenv("DOUBAO_EMBEDDING_DIM", "1024")
+    def test_embedding_dim_custom(self, monkeypatch):
+        monkeypatch.setenv("EMBEDDING_DIM", "1024")
         cfg = self._fresh_config(monkeypatch)
-        assert cfg.doubao_embedding_dim == 1024
+        assert cfg.embedding_dim == 1024
 
     def test_config_is_frozen(self, monkeypatch):
         cfg = self._fresh_config(monkeypatch)
@@ -71,10 +71,10 @@ class TestConfig:
             llm_api_key: str = os.getenv("LLM_API_KEY", "")
             llm_model_name: str = os.getenv("LLM_MODEL_NAME", "")
             ov_data_path: str = os.getenv("OV_DATA_PATH", "./data/ov_store")
-            volcengine_api_key: str = os.getenv("VOLCENGINE_API_KEY", "")
-            volcengine_api_base: str = os.getenv("VOLCENGINE_API_BASE", "")
-            doubao_embedding_model: str = os.getenv("DOUBAO_EMBEDDING_MODEL", "")
-            doubao_embedding_dim: int = int(os.getenv("DOUBAO_EMBEDDING_DIM", "2048"))
-            doubao_vlm_model: str = os.getenv("DOUBAO_VLM_MODEL", "")
+            embedding_api_key: str = os.getenv("EMBEDDING_API_KEY", "")
+            embedding_api_base: str = os.getenv("EMBEDDING_API_BASE", "")
+            embedding_model: str = os.getenv("EMBEDDING_MODEL", "")
+            embedding_dim: int = int(os.getenv("EMBEDDING_DIM", "2048"))
+            vlm_model: str = os.getenv("VLM_MODEL", "")
 
         return _Config()
