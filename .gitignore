@@ -1,0 +1,22 @@
+# Environment
+.env
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Data
+data/
+
+# Sandbox temp
+/tmp/lbg/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
