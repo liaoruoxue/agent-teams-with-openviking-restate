@@ -6,15 +6,16 @@
 
 ## 一、这个 Demo 验证了什么
 
-Demo 在本地 Mac 上跑通了一条完整的 **Agent 协作链路**：
+Demo 在本地 Mac 上跑通了一条完整的 **Agent 协作链路**，**三个 Agent 全部由 LLM 驱动**：
 
 ```
 用户发送任务 "写一个冒泡排序"
-  → Manager Agent（总控）
+  → Manager Agent（总控，LLM 驱动）
     → OpenViking 检索历史经验
+    → LLM 任务规划：将用户任务 + 参考材料 → 精炼的开发规格
     → Coder Agent → LLM 生成代码 → 写入 Sandbox
-    → Tester Agent → 在 Sandbox 执行代码 → 判定 Pass/Fail
-    → 如果 Fail，携带错误信息重试 Coder（最多 3 次）
+    → Tester Agent → 在 Sandbox 执行代码 → LLM 分析执行结果 → 判定 Pass/Fail
+    → 如果 Fail，LLM 分析错误根因 → 携带修复建议重试 Coder（最多 3 次）
     → 如果 Pass，归档代码到 OpenViking
   → 返回结果给用户
 ```
@@ -26,8 +27,9 @@ Demo 在本地 Mac 上跑通了一条完整的 **Agent 协作链路**：
 | Restate 编排能力 | Agent 间 RPC（`ctx.service_call` / `ctx.object_call`）+ 状态保持（`ctx.get/set`）+ side effect 持久化（`ctx.run`）均可用 |
 | OpenViking 知识流转 | "检索 → 生成 → 归档" 闭环跑通，`find` + `overview` + `add_resource` API 工作正常 |
 | Sandbox 模拟 | 本地文件系统 + subprocess 模拟 Pod 执行环境可行，支持代码写入/读取/执行 |
+| 三 Agent 均 LLM 驱动 | Manager（任务规划 + 错误分析）、Coder（代码生成）、Tester（结果分析）均通过 LLM 完成核心决策，体现 "Agent = LLM + 工具" 模式 |
 
-**实测结果**：发送 "写一个冒泡排序" → LLM 生成代码 → 执行输出 `[1, 2, 3, 4, 5]` → 一次通过，零重试。
+**实测结果**：发送 "写一个冒泡排序" → LLM 规划任务 → LLM 生成代码 → 执行 → LLM 分析结果 → 一次通过，零重试。
 
 ---
 
@@ -112,12 +114,15 @@ src/
   → manager/{project_id}/handle_task
     ├─ ctx.service_call(sandbox.create_project, arg=project_id)
     ├─ ctx.run("ov_retrieve", _ov_retrieve)          ← side effect, 持久化
+    ├─ ctx.run("llm_plan", _llm_plan)                ← LLM 任务规划
     ├─ loop (max 3):
     │   ├─ ctx.object_call(coder.generate_code, key=project_id, arg=...)
     │   │   ├─ ctx.run("llm_generate_code", _call_llm)   ← side effect
     │   │   └─ ctx.service_call(sandbox.write_file, arg=...)
     │   └─ ctx.object_call(tester.run_test, key=project_id, arg=...)
-    │       └─ ctx.service_call(sandbox.exec_command, arg=...)
+    │       ├─ ctx.service_call(sandbox.exec_command, arg=...)
+    │       └─ ctx.run("llm_analyse", _llm_analyse)       ← LLM 结果分析
+    │   └─ if failed: ctx.run("llm_error_analysis_{n}")   ← LLM 错误分析
     ├─ if success: ctx.service_call(sandbox.read_file) + ctx.run("ov_archive")
     └─ return {project_id, status, retries, code, test_output}
 ```
@@ -221,18 +226,44 @@ LLM 返回 markdown 格式的代码，`_extract_code()` 按优先级提取：
 2. ` ``` ... ``` ` 通用代码块
 3. 全文兜底（去掉首尾空白）
 
-### 5.5 Tester 的判定逻辑
+### 5.5 Tester 的 LLM 分析
+
+Tester 使用 LLM 分析执行结果，取代原来的简单启发式规则：
 
 ```python
-def _analyse_result(returncode, stdout, stderr) -> bool:
-    if returncode != 0: return False
-    for signal in ["Traceback", "Error:", "Exception:", "FAIL", "AssertionError"]:
-        if signal in stderr or signal in stdout:
-            return False
-    return True
+# LLM 分析执行结果
+llm_response = await ctx.run("llm_analyse", _llm_analyse)
+
+# 从 LLM 回复中提取 VERDICT: PASS 或 VERDICT: FAIL
+verdict = _parse_verdict(llm_response)
+if verdict is not None:
+    passed = verdict
+else:
+    # Fallback 到启发式规则
+    passed = _analyse_result(returncode, stdout, stderr)
 ```
 
-简单启发式：returncode 为 0 且输出中没有错误信号 → Pass。
+`_parse_verdict()` 使用正则匹配 `VERDICT: PASS/FAIL`（大小写不敏感）。如果 LLM 没有返回清晰的 verdict，则 fallback 到原有的 `_analyse_result()` 启发式判断。
+
+### 5.6 Manager 的 LLM 规划与错误分析
+
+Manager 在两个关键环节使用 LLM：
+
+**任务规划**（Step 3）：将用户原始任务 + OV 参考材料发给 LLM，产出精炼的开发规格。Coder 收到的是 LLM 精炼后的 `refined_task` 而非原始 `task`。
+
+```python
+refined_task = await ctx.run("llm_plan", _llm_plan)
+# Coder 收到 refined_task
+coder_req = {"task": refined_task, "reference": reference}
+```
+
+**错误分析**（重试循环）：当测试失败时，Manager 将原始任务 + 生成的代码 + 执行输出发给 LLM 做根因分析，Coder 收到的是 LLM 的修复建议而非原始 stderr。
+
+```python
+error_feedback = await ctx.run(f"llm_error_analysis_{attempt}", _llm_error_analysis)
+# 下一轮 Coder 收到 LLM 的修复建议
+coder_req["error_feedback"] = error_feedback
+```
 
 ---
 
@@ -276,11 +307,10 @@ tests/
 - 给用户实时反馈进度
 - 或使用 Restate 的 `ctx.awakeable()` + webhook 做异步回调
 
-### 7.3 Manager 的重试逻辑是线性的
+### 7.3 Manager 的重试逻辑仍可增强
 
-当前 Coder 失败后只是把 stderr 塞回去让 LLM 重试。没有：
-- 错误分类（语法错误 vs 逻辑错误 vs 依赖缺失）
-- 不同错误类型的不同处理策略
+Manager 已具备 LLM 驱动的错误分析能力（根因分析 + 修复建议），但仍缺少：
+- 错误分类后的不同处理策略（语法错误 vs 逻辑错误 vs 依赖缺失 → 不同修复路径）
 - 复杂任务的分解/拆解能力
 
 ### 7.4 Agent 只有一种固定工具

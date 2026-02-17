@@ -248,7 +248,7 @@ class TestTesterViaRestate:
             f"{RESTATE_INGRESS}/tester/{project_id}/run_test",
             json={"project_id": project_id, "filename": "ok.py"},
             headers={"content-type": "application/json"},
-            timeout=15,
+            timeout=60,  # Tester now calls LLM for analysis
         )
         assert r.status_code == 200
         body = r.json()
@@ -277,7 +277,7 @@ class TestTesterViaRestate:
             f"{RESTATE_INGRESS}/tester/{project_id}/run_test",
             json={"project_id": project_id, "filename": "bad.py"},
             headers={"content-type": "application/json"},
-            timeout=15,
+            timeout=60,  # Tester now calls LLM for analysis
         )
         assert r.status_code == 200
         body = r.json()

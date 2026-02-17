@@ -1,6 +1,6 @@
 """Tests for tester agent helper functions."""
 
-from src.agents.tester import _analyse_result, _build_analysis
+from src.agents.tester import _analyse_result, _parse_verdict
 
 
 class TestAnalyseResult:
@@ -37,30 +37,31 @@ class TestAnalyseResult:
         assert _analyse_result(0, "", "") is True
 
 
-class TestBuildAnalysis:
-    def test_passed_message(self):
-        msg = _build_analysis(True, 0, "ok", "")
-        assert "PASSED" in msg
-        assert "Return code 0" in msg
+class TestParseVerdict:
+    def test_pass_verdict(self):
+        assert _parse_verdict("Everything looks good.\nVERDICT: PASS") is True
 
-    def test_failed_message(self):
-        msg = _build_analysis(False, 1, "", "some error")
-        assert "FAILED" in msg
-        assert "Return code 1" in msg
-        assert "Stderr:" in msg
+    def test_fail_verdict(self):
+        assert _parse_verdict("There was a traceback.\nVERDICT: FAIL") is False
 
-    def test_failed_with_traceback_in_stdout(self):
-        msg = _build_analysis(False, 1, "Traceback (most recent call last):\n...", "")
-        assert "Traceback found in stdout" in msg
+    def test_case_insensitive_pass(self):
+        assert _parse_verdict("verdict: pass") is True
 
-    def test_failed_empty_stderr_no_stderr_section(self):
-        msg = _build_analysis(False, 1, "output", "")
-        assert "Stderr:" not in msg
+    def test_case_insensitive_fail(self):
+        assert _parse_verdict("Verdict: Fail") is False
 
-    def test_failed_stderr_truncated(self):
-        long_stderr = "x" * 1000
-        msg = _build_analysis(False, 1, "", long_stderr)
-        # _build_analysis truncates to 500 chars
-        assert "Stderr:" in msg
-        # The stderr in the message should be at most 500 chars of the original
-        assert len(long_stderr[:500]) == 500
+    def test_mixed_case(self):
+        assert _parse_verdict("VERDICT: Pass") is True
+
+    def test_no_verdict_returns_none(self):
+        assert _parse_verdict("No clear conclusion here.") is None
+
+    def test_empty_string_returns_none(self):
+        assert _parse_verdict("") is None
+
+    def test_verdict_with_extra_whitespace(self):
+        assert _parse_verdict("VERDICT:   PASS") is True
+
+    def test_verdict_in_middle_of_text(self):
+        response = "Analysis: code failed.\nVERDICT: FAIL\nEnd of report."
+        assert _parse_verdict(response) is False
